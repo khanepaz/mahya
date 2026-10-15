@@ -90,7 +90,7 @@
     </div>
     <div class="panel" style="margin-top:10px">
       <strong>✨ جادوی سبک با هوش مصنوعی</strong>
-      <p class="status">نقاشی بکش یا عکس بگذار، بعد سبک را انتخاب کن. تأیید والد لازم است. مدل Vision انتخاب کنید.</p>
+      <p class="status">نقاشی بکش یا عکس بگذار، بعد سبک را انتخاب کن.</p>
       <div class="btn-row">
         <button class="btn secondary" onclick="stylePainting('گیبلی / انیمه کودکانه')">🎬 گیبلی</button>
         <button class="btn secondary" onclick="stylePainting('واقعی و طبیعی')">📷 واقعی</button>
@@ -133,7 +133,7 @@
   <div class="page" id="page-homework">
     <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">📚 دوست کوچولوی یادگیری</div></div>
     <div class="panel">
-      <p class="status">این بخش با کمک هوش مصنوعی کار می‌کند. کلید API را در تنظیمات والد وارد کن.</p>
+      <p class="status">کلید API را در تنظیمات والد وارد کن.</p>
       <textarea class="textarea" id="hwQuestion" placeholder="سؤال درس‌ات را بنویس..."></textarea>
       <div class="btn-row">
         <button class="btn" onclick="askHomework()">❓ بپرس</button>
@@ -199,9 +199,10 @@
     </div>
     <div class="btn-row">
       <button class="btn" onclick="aiWordGuess()">✨ حدس کلمه با AI</button>
-      <button class="btn secondary" onclick="aiPattern()">✨ الگوی جدید با AI</button>
-      <button class="btn secondary" onclick="aiRiddle()">✨ معمای تازه با AI</button>
+      <button class="btn secondary" onclick="aiPattern()">✨ الگو با AI</button>
+      <button class="btn secondary" onclick="showRiddleMaker()">✨ معمای دلخواه</button>
     </div>
+    <p class="status">معما و الگو را با تایپ یا 🎤 صدا موضوعش را بگو.</p>
     <div id="gameArea"></div>
   </div>
   <div class="page" id="page-dreams">
@@ -245,23 +246,22 @@
         <button class="btn" onclick="unlockParent()">ورود</button>
       </div>
       <div id="parentPanel" class="hidden">
-        <label class="label">کلید API (فقط در حافظه نشست):</label>
+        <label class="label">کلید API:</label>
         <input class="input" type="password" id="apiKey" placeholder="sk-...">
         <label class="label">آدرس پایه API:</label>
-        <input class="input" id="apiBase" value="https://www.cleanapis.com/v1">
+        <input class="input" id="apiBase" value="https://cleanapis.com/v1">
         <label class="label">مدل:</label>
-        <select class="select" id="apiModel"><option value="grok-4.5">grok-4.5</option></select>
+        <select class="select" id="apiModel"><option value="gpt-5.6-luna">gpt-5.6-luna</option></select>
         <div class="btn-row">
           <button class="btn" onclick="testApi()">🔌 تست اتصال</button>
           <button class="btn secondary" onclick="fetchModels()">📋 دریافت مدل‌ها</button>
         </div>
         <div id="apiStatus" class="status"></div>
         <label class="label">حداکثر توکن خروجی:</label>
-        <input class="input" type="number" id="maxTokens" value="600" min="50" max="2000">
+        <input class="input" type="number" id="maxTokens" value="2048" min="256" max="8192">
         <div class="btn-row" style="margin-top:12px">
-          <button class="btn danger" onclick="clearAllData()">🗑️ پاک کردن همه داده‌های محلی</button>
+          <button class="btn danger" onclick="clearAllData()">🗑️ پاک کردن داده‌ها</button>
         </div>
-        <p class="status" style="margin-top:12px;color:#c62828">⚠️ کلید فقط در حافظه نشست است. برای عکس/نقاشی مدل Vision انتخاب کنید (مثلاً gpt-5.6-luna).</p>
       </div>
     </div>
   </div>
@@ -275,6 +275,7 @@
 </div>
 <div class="toast" id="toast"></div>
 <script src="app-part1.js"></script>
+<script src="app-paint-fix.js"></script>
 <script src="app-part2.js"></script>
 <script src="app-ai.js"></script>
 </body>
