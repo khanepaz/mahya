@@ -55,6 +55,12 @@
         <button class="btn secondary" onclick="startCountQuiz()">🔢 شمارش</button>
         <button class="btn secondary" onclick="startShapeQuiz()">🔷 شکل‌ها</button>
       </div>
+      <hr style="border:none;border-top:1px solid #f0d0e8;margin:14px 0">
+      <strong>📷 عکس صفحه کتاب → سؤال هوشمند</strong>
+      <p class="status">عکس واضح از صفحه درس بگیر یا انتخاب کن. تأیید والد قبل از ارسال لازم است.</p>
+      <input type="file" id="bookPhoto" accept="image/*" capture="environment" class="input">
+      <div id="bookPreview" style="margin:8px 0"></div>
+      <button class="btn" onclick="analyzeBookPage()">✨ بساز سؤال از این درس</button>
       <div id="quizArea"></div>
     </div>
   </div>
@@ -77,6 +83,18 @@
       <button class="btn" onclick="savePainting()">💾 ذخیره نقاشی</button>
       <button class="btn secondary" onclick="downloadPainting()">⬇️ دانلود PNG</button>
       <button class="btn secondary" onclick="loadIdea()">💡 ایده تصادفی</button>
+    </div>
+    <div class="panel" style="margin-top:10px">
+      <strong>✨ جادوی سبک با هوش مصنوعی</strong>
+      <p class="status">نقاشی‌ات را بکش، بعد سبک را انتخاب کن. قبل از ارسال، تأیید والد لازم است.</p>
+      <div class="btn-row">
+        <button class="btn secondary" onclick="stylePainting('گیبلی / انیمه کودکانه')">🎬 گیبلی</button>
+        <button class="btn secondary" onclick="stylePainting('واقعی و طبیعی')">📷 واقعی</button>
+        <button class="btn secondary" onclick="stylePainting('کارتونی رنگی')">🎨 کارتونی</button>
+        <button class="btn secondary" onclick="stylePainting('آبرنگ لطیف')">💧 آبرنگ</button>
+        <button class="btn secondary" onclick="stylePainting('داستان مصور')">📚 مصور</button>
+      </div>
+      <div id="styleResult" class="msg ai" style="display:none;margin-top:8px"></div>
     </div>
     <p class="status" id="paintIdea"></p>
     <div class="panel" style="margin-top:12px">
@@ -175,6 +193,11 @@
       <button class="btn secondary" onclick="startOddOne()">🔍 شکل متفاوت</button>
       <button class="btn secondary" onclick="startWordGuess()">🔤 حدس کلمه</button>
     </div>
+    <div class="btn-row">
+      <button class="btn" onclick="aiWordGuess()">✨ حدس کلمه با AI</button>
+      <button class="btn secondary" onclick="aiPattern()">✨ الگوی جدید با AI</button>
+      <button class="btn secondary" onclick="aiRiddle()">✨ معمای تازه با AI</button>
+    </div>
     <div id="gameArea"></div>
   </div>
   <div class="page" id="page-dreams">
@@ -234,7 +257,7 @@
         <div class="btn-row" style="margin-top:12px">
           <button class="btn danger" onclick="clearAllData()">🗑️ پاک کردن همه داده‌های محلی</button>
         </div>
-        <p class="status" style="margin-top:12px;color:#c62828">⚠️ کلید API فقط در حافظه مرورگر این نشست نگه داشته می‌شود و در فایل یا localStorage ذخیره نمی‌شود. پس از بستن صفحه باید دوباره وارد شود. استفاده مستقیم از کلید در مرورگر کاملاً امن نیست.</p>
+        <p class="status" style="margin-top:12px;color:#c62828">⚠️ کلید API فقط در حافظه مرورگر این نشست نگه داشته می‌شود. برای تصویر، مدل Vision انتخاب کنید.</p>
       </div>
     </div>
   </div>
