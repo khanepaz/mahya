@@ -199,7 +199,9 @@ async function callAPI(messages, opts) {
   }
   const base = ((document.getElementById('apiBase') && document.getElementById('apiBase').value) || state.apiBase).replace(/\/$/, '');
   const model = (document.getElementById('apiModel') && document.getElementById('apiModel').value) || state.apiModel;
-  const body = { model: model, messages: messages.slice(-6), max_tokens: opts.max_tokens || 800, temperature: 0.8 };
+  // مدل‌های reasoning (مثل grok-4.6) بخش زیادی از توکن را برای فکر کردن مصرف می‌کنند
+  const maxTok = opts.max_tokens || 2500;
+  const body = { model: model, messages: messages.slice(-6), max_tokens: maxTok, temperature: 0.8 };
   try {
     const lr = document.getElementById('lastRequest');
     if (lr) lr.textContent = 'آخرین درخواست: ' + new Date().toLocaleTimeString('fa-IR');
@@ -216,7 +218,20 @@ async function callAPI(messages, opts) {
       return { error: msg };
     }
     const data = await res.json();
-    const content = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || data.content || JSON.stringify(data);
+    const choice = data.choices && data.choices[0];
+    let content = null;
+    if (choice && choice.message) {
+      content = choice.message.content;
+      if (!content && choice.message.refusal) content = choice.message.refusal;
+    }
+    if (!content && typeof data.content === 'string') content = data.content;
+    // اگر content خالی بود، JSON خام را به کودک نشان نده
+    if (!content || (typeof content === 'string' && !content.trim())) {
+      if (choice && choice.finish_reason === 'length') {
+        return { error: 'پاسخ کامل نشد (مدل برای فکر کردن توکن زیاد مصرف کرد). سؤال کوتاه‌تری بپرس یا مدل دیگری انتخاب کن.' };
+      }
+      return { error: 'پاسخ خالی برگشت. مدل را عوض کن یا دوباره امتحان کن.' };
+    }
     return { content: content, usage: data.usage };
   } catch (e) {
     if (e.name === 'TypeError') return { error: 'خطای شبکه یا CORS. برای تست از localhost استفاده کن.' };
@@ -225,7 +240,7 @@ async function callAPI(messages, opts) {
 }
 
 function systemPrompt(extra) {
-  return 'تو یک دستیار مهربان و کودکانه برای دختر ۷ ساله به نام محیا هستی. همیشه به فارسی ساده، شاد و مناسب کودک پاسخ بده. از محتوای ترسناک، خشن یا نامناسب پرهیز کن. ' + (extra || '');
+  return 'تو یک دستیار مهربان و کودکانه برای دختر ۷ ساله به نام محیا هستی. همیشه به فارسی ساده، شاد و مناسب کودک پاسخ بده. جواب را کوتاه و واضح بنویس. از محتوای ترسناک، خشن یا نامناسب پرهیز کن. ' + (extra || '');
 }
 
 function renderWordChips() {
@@ -252,9 +267,9 @@ async function makeStory() {
   if (state.apiKey && state.apiEnabled) {
     const res = await callAPI([
       { role: 'system', content: systemPrompt('یک داستان کودکانه کوتاه و زیبا بنویس.') },
-      { role: 'user', content: 'یک داستان ' + length + ' و ' + style + ' با این کلمات بساز: ' + words + '. مناسب کودک ۷ ساله.' }
+      { role: 'user', content: 'یک داستان ' + length + ' و ' + style + ' با این کلمات بساز: ' + words + '. مناسب کودک ۷ ساله. جواب فقط متن داستان باشد.' }
     ]);
-    if (res.content) text = res.content;
+    if (res.content && !res.error) text = res.content;
     else if (res.error) showTempMsg('storyStatus', res.error + ' — داستان محلی نمایش داده شد.', 'warn');
   }
   document.getElementById('storyText').textContent = text;
@@ -274,9 +289,9 @@ async function continueStory(choice) {
   if (state.apiKey && state.apiEnabled) {
     const res = await callAPI([
       { role: 'system', content: systemPrompt() },
-      { role: 'user', content: 'ادامه این داستان را بنویس که شخصیت ' + choice + ' را انتخاب کند:\n' + prev.slice(0, 400) }
+      { role: 'user', content: 'ادامه این داستان را کوتاه بنویس که شخصیت ' + choice + ' را انتخاب کند:\n' + prev.slice(0, 400) }
     ]);
-    if (res.content) { document.getElementById('storyText').textContent = prev + '\n\n' + res.content; return; }
+    if (res.content && !res.error) { document.getElementById('storyText').textContent = prev + '\n\n' + res.content; return; }
   }
   const cont = {
     'غار': '\n\nاو وارد غار جادویی شد و آنجا ستاره‌های درخشان پیدا کرد که به او قدرت مهربانی دادند!',
@@ -375,10 +390,10 @@ async function askHomework() {
   }
   chat.innerHTML += '<div class="bubble bubble-ai"><span class="spinner"></span> فکر می‌کنم...</div>';
   const res = await callAPI([
-    { role: 'system', content: systemPrompt('مثل یک معلم مهربان کلاس اول رفتار کن. اول راهنمایی کن، جواب نهایی را فوری نگو.') },
+    { role: 'system', content: systemPrompt('مثل یک معلم مهربان کلاس اول رفتار کن. اول راهنمایی کن، جواب نهایی را فوری نگو. جواب کوتاه باشد.') },
     { role: 'user', content: q }
   ]);
-  chat.lastChild.innerHTML = res.content || res.error || 'خطا در پاسخ';
+  chat.lastChild.innerHTML = escapeHtml(res.content || res.error || 'خطا در پاسخ');
   chat.scrollTop = chat.scrollHeight;
 }
 
@@ -397,10 +412,10 @@ async function askTutor(mode) {
   }
   chat.innerHTML += '<div class="bubble bubble-ai"><span class="spinner"></span></div>';
   const res = await callAPI([
-    { role: 'system', content: systemPrompt('دستیار یادگیری کلاس اول. مرحله‌به‌مرحله راهنمایی کن.') },
+    { role: 'system', content: systemPrompt('دستیار یادگیری کلاس اول. مرحله‌به‌مرحله و کوتاه راهنمایی کن.') },
     { role: 'user', content: prompt }
   ]);
-  chat.lastChild.innerHTML = res.content || res.error;
+  chat.lastChild.innerHTML = escapeHtml(res.content || res.error || 'خطا');
   chat.scrollTop = chat.scrollHeight;
 }
 
