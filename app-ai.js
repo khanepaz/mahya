@@ -7,10 +7,11 @@ function syncApiFromUI() {
   if (keyEl && keyEl.value.trim()) state.apiKey = keyEl.value.trim();
   if (baseEl && baseEl.value.trim()) state.apiBase = baseEl.value.trim().replace(/\/$/, '');
   if (modelEl && modelEl.value) state.apiModel = modelEl.value;
-  if (tokEl) state.maxTokens = parseInt(tokEl.value) || 600;
+  let mt = tokEl ? parseInt(tokEl.value) : 0;
+  if (!mt || mt < 2048) mt = 2048;
+  state.maxTokens = mt;
 }
 
-/** استخراج متن از پاسخ‌های مختلف API */
 function extractReply(data) {
   if (!data) return null;
   if (typeof data === 'string') return data;
@@ -20,16 +21,23 @@ function extractReply(data) {
       const m = c0.message;
       if (typeof m.content === 'string' && m.content.trim()) return m.content;
       if (Array.isArray(m.content)) {
-        const parts = m.content.map(p => (typeof p === 'string' ? p : (p.text || p.content || ''))).join('');
+        const parts = m.content.map(p => {
+          if (typeof p === 'string') return p;
+          if (p && p.type === 'text' && p.text) return p.text;
+          return (p && (p.text || p.content)) || '';
+        }).join('');
         if (parts.trim()) return parts;
       }
       if (m.refusal) return '⚠️ مدل رد کرد: ' + m.refusal;
     }
     if (typeof c0.text === 'string' && c0.text.trim()) return c0.text;
     if (c0.delta && c0.delta.content) return c0.delta.content;
+    if (c0.finish_reason === 'length') {
+      return '⚠️ پاسخ قطع شد (max_tokens کم بود). در تنظیمات والد حداکثر توکن را روی 4096 بگذارید.';
+    }
   }
-  if (data.output_text) return data.output_text;
-  if (data.content && typeof data.content === 'string') return data.content;
+  if (data.output_text && String(data.output_text).trim()) return data.output_text;
+  if (data.content && typeof data.content === 'string' && data.content.trim()) return data.content;
   if (data.error) {
     const e = data.error;
     return '⚠️ خطا: ' + (e.message || e.code || JSON.stringify(e));
@@ -37,7 +45,10 @@ function extractReply(data) {
   return null;
 }
 
-/** ارسال پیام متنی یا چندرسانه‌ای (متن + تصویر base64) */
+function apiBaseUrl() {
+  return (state.apiBase || 'https://cleanapis.com/v1').replace(/\/$/, '').replace('www.cleanapis.com', 'cleanapis.com');
+}
+
 async function callAPIVision(userContent, systemExtra) {
   syncApiFromUI();
   if (!state.apiKey) {
@@ -45,8 +56,8 @@ async function callAPIVision(userContent, systemExtra) {
     showPage('parent');
     return null;
   }
-  const modelUsed = state.apiModel || 'grok-4.5';
-  const base = (state.apiBase || 'https://cleanapis.com/v1').replace(/\/$/, '');
+  const modelUsed = state.apiModel || 'gpt-5.6-luna';
+  const base = apiBaseUrl();
   const sys = 'تو یک دستیار مهربان، شاد و مناسب کودک ۷ ساله هستی. همیشه به فارسی ساده، کوتاه و کودکانه پاسخ بده. از محتوای نامناسب پرهیز کن. نام کودک محیا است.' + (systemExtra || '');
   const body = {
     model: modelUsed,
@@ -54,10 +65,10 @@ async function callAPIVision(userContent, systemExtra) {
       { role: 'system', content: sys },
       { role: 'user', content: userContent }
     ],
-    max_tokens: state.maxTokens || 800,
+    max_tokens: Math.max(state.maxTokens || 2048, 2048),
     temperature: 0.7
   };
-  console.log('[Mahya API]', base + '/chat/completions', 'model=', modelUsed);
+  console.log('[Mahya API]', base + '/chat/completions', 'model=', modelUsed, 'max_tokens=', body.max_tokens);
   try {
     const res = await fetch(base + '/chat/completions', {
       method: 'POST',
@@ -71,14 +82,17 @@ async function callAPIVision(userContent, systemExtra) {
     let data;
     try { data = JSON.parse(raw); } catch (_) { data = null; }
     if (!res.ok) {
-      const errMsg = (data && data.error && (data.error.message || data.error.code)) || raw.slice(0, 200);
+      const errMsg = (data && data.error && (data.error.message || data.error.code)) || raw.slice(0, 300);
       throw new Error('HTTP ' + res.status + ' | مدل: ' + modelUsed + ' | ' + errMsg);
     }
     let text = extractReply(data);
     const usedModel = (data && (data.model || data.model_id)) || modelUsed;
+    const finish = data && data.choices && data.choices[0] && data.choices[0].finish_reason;
     if (!text || !String(text).trim()) {
-      console.warn('[Mahya] empty reply, raw:', raw.slice(0, 500));
-      return '⚠️ پاسخی دریافت نشد.\nمدل درخواست‌شده: ' + modelUsed + '\nمدل در پاسخ: ' + usedModel + '\n(جزئیات در Console — F12)';
+      console.warn('[Mahya] empty reply, finish=', finish, 'raw=', raw.slice(0, 800));
+      return '⚠️ پاسخی دریافت نشد.\nمدل: ' + modelUsed +
+        '\nfinish_reason: ' + (finish || '?') +
+        '\nاگر finish=length بود، max_tokens را روی 4096 بگذار.';
     }
     if (typeof text === 'string' && !text.startsWith('⚠️')) {
       text = text + '\n\n— مدل: ' + usedModel;
@@ -105,6 +119,7 @@ function canvasToDataURL(maxW) {
 }
 
 async function stylePainting(styleName) {
+  syncApiFromUI();
   if (!state.apiKey) {
     toast('اول کلید API را در تنظیمات والد وارد کن');
     showPage('parent');
@@ -118,20 +133,15 @@ async function stylePainting(styleName) {
   const box = document.getElementById('styleResult');
   box.style.display = 'block';
   box.textContent = 'در حال جادو کردن نقاشی با سبک ' + styleName + '... ✨';
-
   const content = [
     {
       type: 'text',
-      text: `این نقاشی یک کودک ۷ ساله است. لطفاً:\n1) خیلی کوتاه بگو در تصویر چه چیزهایی می‌بینی.\n2) یک توصیف زیبا و کودکانه بنویس که اگر همین نقاشی با سبک «${styleName}» بازآفرینی شود چگونه به نظر می‌رسد.\n3) یک پرامپت انگلیسی کوتاه برای تولید تصویر در سبک ${styleName} پیشنهاد بده.\nپاسخ را به فارسی ساده بنویس، به‌جز پرامپت انگلیسی.`
+      text: 'این نقاشی یک کودک ۷ ساله است. لطفاً:\n1) خیلی کوتاه بگو در تصویر چه چیزهایی می‌بینی.\n2) یک توصیف زیبا و کودکانه بنویس که اگر همین نقاشی با سبک «' + styleName + '» بازآفرینی شود چگونه به نظر می‌رسد.\n3) یک پرامپت انگلیسی کوتاه برای تولید تصویر پیشنهاد بده.\nپاسخ را به فارسی ساده بنویس، به‌جز پرامپت انگلیسی.'
     },
-    {
-      type: 'image_url',
-      image_url: { url: dataUrl }
-    }
+    { type: 'image_url', image_url: { url: dataUrl } }
   ];
-
   const text = await callAPIVision(content, ' اگر مدل vision نیست صادقانه بگو.');
-  box.textContent = text || 'نتیجه‌ای نیامد. مدل Vision را در تنظیمات والد انتخاب کن.';
+  box.textContent = text || 'نتیجه‌ای نیامد.';
   if (text && !text.startsWith('⚠️')) addStars(2);
 }
 
@@ -150,6 +160,7 @@ document.addEventListener('change', function(e) {
 });
 
 async function analyzeBookPage() {
+  syncApiFromUI();
   if (!state.apiKey) {
     toast('اول کلید API را در تنظیمات والد وارد کن');
     showPage('parent');
@@ -162,30 +173,26 @@ async function analyzeBookPage() {
     return;
   }
   if (!confirm('والد عزیز: عکس صفحه کتاب برای ساخت سؤال آموزشی ارسال شود؟')) return;
-
   const area = document.getElementById('quizArea');
   area.innerHTML = '<div class="msg ai">در حال خواندن صفحه کتاب و ساخت سؤال... 📚</div>';
-
   const content = [
     {
       type: 'text',
-      text: `این عکس صفحه کتاب درسی یک کودک کلاس اول است.\n1) متن یا موضوع درس را تا حد ممکن بخوان و خلاصه کن.\n2) دقیقاً ۳ سؤال آموزشی ساده و مناسب کلاس اول بساز.\n3) برای هر سؤال پاسخ درست را هم مشخص کن.\nخروجی را به فارسی ساده بنویس.\nاگر تصویر خوانا نبود، بگو عکس واضح‌تری لازم است.`
+      text: 'این عکس صفحه کتاب درسی یک کودک کلاس اول است.\n1) متن یا موضوع درس را تا حد ممکن بخوان و خلاصه کن.\n2) دقیقاً ۳ سؤال آموزشی ساده و مناسب کلاس اول بساز.\n3) برای هر سؤال پاسخ درست را هم مشخص کن.\nخروجی را به فارسی ساده بنویس.'
     },
     { type: 'image_url', image_url: { url: dataUrl } }
   ];
-
   const text = await callAPIVision(content);
   area.innerHTML = '<div class="msg ai" style="white-space:pre-wrap">' + (text || 'نتیجه‌ای نیامد') + '</div>' +
     '<button class="btn secondary" style="margin-top:8px" onclick="analyzeBookPage()">دوباره بساز</button>';
   if (text && !text.startsWith('⚠️')) addStars(2);
 }
 
-/* ========== AI GAMES ========== */
 async function aiWordGuess() {
   const area = document.getElementById('gameArea');
   area.innerHTML = '<div class="msg ai">در حال ساخت حدس کلمه جادویی...</div>';
   const text = await callAPI([{role:'user', content:
-`یک بازی «حدس کلمه» برای کودک ۷ ساله بساز.\nفقط این فرمت JSON خالص را برگردان:\n{"word":"کلمه","hint":"سرنخ کوتاه فارسی"}\nکلمه باید یک اسم ساده فارسی باشد.`}]);
+'یک بازی «حدس کلمه» برای کودک ۷ ساله بساز.\nفقط این فرمت JSON خالص را برگردان:\n{"word":"کلمه","hint":"سرنخ کوتاه فارسی"}\nکلمه باید یک اسم ساده فارسی باشد.'}]);
   let word = 'گل', hint = 'زیبا و خوشبو در باغ';
   try {
     const m = (text || '').match(/\{[\s\S]*\}/);
@@ -206,15 +213,14 @@ async function aiPattern() {
   const area = document.getElementById('gameArea');
   area.innerHTML = '<div class="msg ai">در حال ساخت الگو...</div>';
   const text = await callAPI([{role:'user', content:
-`یک الگوی عددی ساده برای کودک ۷ ساله بساز.\nفقط JSON خالص:\n{"seq":[2,4,6,8],"answer":10,"explain":"هر بار ۲ تا اضافه می‌شود"}\nاعداد کوچک و الگوی واضح باشد.`}]);
-  let seq = [2,4,6,8], ans = 10, expl = 'هر بار ۲ تا اضافه می‌شود';
+'یک الگوی عددی ساده برای کودک ۷ ساله بساز.\nفقط JSON خالص:\n{"seq":[2,4,6,8],"answer":10,"explain":"هر بار ۲ تا اضافه می‌شود"}\nاعداد کوچک و الگوی واضح باشد.'}]);
+  let seq = [2,4,6,8], ans = 10;
   try {
     const m = (text || '').match(/\{[\s\S]*\}/);
     if (m) {
       const j = JSON.parse(m[0]);
       if (Array.isArray(j.seq)) seq = j.seq;
       if (j.answer != null) ans = j.answer;
-      if (j.explain) expl = j.explain;
     }
   } catch(e) {}
   const opts = shuffle([ans, ans+1, ans-1, ans+2].map(Number));
@@ -228,7 +234,7 @@ async function aiRiddle() {
   const area = document.getElementById('gameArea');
   area.innerHTML = '<div class="msg ai">در حال ساخت معما...</div>';
   const text = await callAPI([{role:'user', content:
-`یک معمای کوتاه و شاد برای کودک ۷ ساله بساز.\nفقط JSON خالص:\n{"riddle":"متن معما","answer":"جواب کوتاه"}\nمعما ترسناک نباشد.`}]);
+'یک معمای کوتاه و شاد برای کودک ۷ ساله بساز.\nفقط JSON خالص:\n{"riddle":"متن معما","answer":"جواب کوتاه"}\nمعما ترسناک نباشد.'}]);
   let riddle = 'چی همیشه می‌آد ولی هیچ‌وقت نمی‌مونه؟', answer = 'فردا';
   try {
     const m = (text || '').match(/\{[\s\S]*\}/);
@@ -245,7 +251,6 @@ async function aiRiddle() {
     <button class="btn secondary" onclick="aiRiddle()">معمای جدید</button>`;
 }
 
-/** بارگذاری عکس روی بوم نقاشی */
 function loadPhotoToCanvas(input) {
   const f = input.files && input.files[0];
   if (!f) return;
@@ -275,7 +280,6 @@ function loadPhotoToCanvas(input) {
   reader.readAsDataURL(f);
 }
 
-/** بازنویسی callAPI تا همیشه مدل انتخاب‌شده را بفرستد */
 async function callAPI(messages, systemExtra) {
   syncApiFromUI();
   if (!state.apiKey) {
@@ -283,16 +287,16 @@ async function callAPI(messages, systemExtra) {
     showPage('parent');
     return null;
   }
-  const modelUsed = state.apiModel || 'grok-4.5';
-  const base = (state.apiBase || 'https://cleanapis.com/v1').replace(/\/$/, '');
+  const modelUsed = state.apiModel || 'gpt-5.6-luna';
+  const base = apiBaseUrl();
   const sys = 'تو یک دستیار مهربان، شاد و مناسب کودک ۷ ساله هستی. همیشه به فارسی ساده، کوتاه و کودکانه پاسخ بده. از محتوای نامناسب، ترسناک یا پیچیده پرهیز کن. نام کودک محیا است.' + (systemExtra || '');
   const body = {
     model: modelUsed,
     messages: [{ role: 'system', content: sys }, ...messages],
-    max_tokens: state.maxTokens || 600,
+    max_tokens: Math.max(state.maxTokens || 2048, 2048),
     temperature: 0.8
   };
-  console.log('[Mahya API]', base + '/chat/completions', 'model=', modelUsed);
+  console.log('[Mahya API]', base + '/chat/completions', 'model=', modelUsed, 'max_tokens=', body.max_tokens);
   try {
     const res = await fetch(base + '/chat/completions', {
       method: 'POST',
@@ -306,14 +310,16 @@ async function callAPI(messages, systemExtra) {
     let data;
     try { data = JSON.parse(raw); } catch (_) { data = null; }
     if (!res.ok) {
-      const errMsg = (data && data.error && (data.error.message || data.error.code)) || raw.slice(0, 200);
+      const errMsg = (data && data.error && (data.error.message || data.error.code)) || raw.slice(0, 300);
       throw new Error('HTTP ' + res.status + ' | مدل: ' + modelUsed + ' | ' + errMsg);
     }
     let text = extractReply(data);
-    const usedModel = (data && (data.model || data.model_id)) || modelUsed;
+    const finish = data && data.choices && data.choices[0] && data.choices[0].finish_reason;
     if (!text || !String(text).trim()) {
-      console.warn('[Mahya] empty reply, raw:', raw.slice(0, 500));
-      return '⚠️ پاسخی دریافت نشد.\nمدل درخواست‌شده: ' + modelUsed + '\nمدل در پاسخ: ' + usedModel;
+      console.warn('[Mahya] empty reply, finish=', finish, 'raw=', raw.slice(0, 800));
+      return '⚠️ پاسخی دریافت نشد.\nمدل: ' + modelUsed +
+        '\nfinish_reason: ' + (finish || '?') +
+        '\nاگر finish=length بود، max_tokens را روی 4096 بگذار.';
     }
     return text;
   } catch (e) {
@@ -325,13 +331,16 @@ async function callAPI(messages, systemExtra) {
 
 async function testApi() {
   syncApiFromUI();
-  document.getElementById('apiStatus').textContent = 'در حال تست با مدل ' + (state.apiModel || '?') + '...';
+  const status = document.getElementById('apiStatus');
+  status.textContent = 'در حال تست با مدل ' + (state.apiModel || '?') + ' (max_tokens=' + state.maxTokens + ')...';
   if (!state.apiKey) {
-    document.getElementById('apiStatus').innerHTML = '<span class="error">کلید را وارد کن</span>';
+    status.innerHTML = '<span class="error">کلید را وارد کن</span>';
     return;
   }
-  const r = await callAPI([{ role: 'user', content: 'فقط بنویس: سلام محیا جان! مدل تو چیست؟' }]);
-  document.getElementById('apiStatus').innerHTML = r
-    ? '<span class="success">✅ اتصال موفق — مدل انتخابی: ' + (state.apiModel || '') + '</span><br>' + r
+  const tokEl = document.getElementById('maxTokens');
+  if (tokEl && parseInt(tokEl.value) < 2048) tokEl.value = '2048';
+  const r = await callAPI([{ role: 'user', content: 'فقط بنویس: سلام محیا جان!' }]);
+  status.innerHTML = r
+    ? '<span class="success">✅ اتصال موفق — مدل: ' + (state.apiModel || '') + '</span><br><pre style="white-space:pre-wrap;font-size:0.85rem">' + r + '</pre>'
     : '<span class="error">❌ ناموفق</span>';
 }
