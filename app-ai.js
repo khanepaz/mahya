@@ -68,7 +68,6 @@ async function callAPIVision(userContent, systemExtra) {
     max_tokens: Math.max(state.maxTokens || 2048, 2048),
     temperature: 0.7
   };
-  console.log('[Mahya API]', base + '/chat/completions', 'model=', modelUsed, 'max_tokens=', body.max_tokens);
   try {
     const res = await fetch(base + '/chat/completions', {
       method: 'POST',
@@ -87,12 +86,8 @@ async function callAPIVision(userContent, systemExtra) {
     }
     let text = extractReply(data);
     const usedModel = (data && (data.model || data.model_id)) || modelUsed;
-    const finish = data && data.choices && data.choices[0] && data.choices[0].finish_reason;
     if (!text || !String(text).trim()) {
-      console.warn('[Mahya] empty reply, finish=', finish, 'raw=', raw.slice(0, 800));
-      return '⚠️ پاسخی دریافت نشد.\nمدل: ' + modelUsed +
-        '\nfinish_reason: ' + (finish || '?') +
-        '\nاگر finish=length بود، max_tokens را روی 4096 بگذار.';
+      return '⚠️ پاسخی دریافت نشد. مدل: ' + modelUsed;
     }
     if (typeof text === 'string' && !text.startsWith('⚠️')) {
       text = text + '\n\n— مدل: ' + usedModel;
@@ -107,10 +102,11 @@ async function callAPIVision(userContent, systemExtra) {
 
 function canvasToDataURL(maxW) {
   if (!canvas) return null;
+  const max = maxW || 640;
   const tmp = document.createElement('canvas');
-  const scale = Math.min(1, (maxW || 512) / canvas.width);
-  tmp.width = Math.max(1, Math.floor(canvas.width * scale / 2));
-  tmp.height = Math.max(1, Math.floor(canvas.height * scale / 2));
+  const scale = Math.min(1, max / canvas.width);
+  tmp.width = Math.max(1, Math.floor(canvas.width * scale));
+  tmp.height = Math.max(1, Math.floor(canvas.height * scale));
   const tctx = tmp.getContext('2d');
   tctx.fillStyle = '#fff';
   tctx.fillRect(0, 0, tmp.width, tmp.height);
@@ -146,8 +142,7 @@ function loadImageInto(wrap, urls, styleName) {
   let i = 0;
   function tryNext() {
     if (i >= urls.length) {
-      wrap.innerHTML = '<p class="error">ساخت تصویر ممکن نشد (شبکه یا فیلتر سرویس تصویر).</p>' +
-        '<p class="status">اگر فیلتر اینترنت دارید، یک‌بار با اینترنت دیگر یا VPN امتحان کنید.</p>' +
+      wrap.innerHTML = '<p class="error">ساخت تصویر ممکن نشد (شبکه یا فیلتر).</p>' +
         '<button class="btn secondary" type="button" id="btnRetryStyle">تلاش دوباره</button>';
       const b = document.getElementById('btnRetryStyle');
       if (b) b.onclick = function() { stylePainting(styleName); };
@@ -162,8 +157,7 @@ function loadImageInto(wrap, urls, styleName) {
       })
       .then(function(blob) {
         if (blob && blob.size < 800) throw new Error('empty');
-        const obj = URL.createObjectURL(blob);
-        showImg(obj, url);
+        showImg(URL.createObjectURL(blob), url);
       })
       .catch(function() {
         const img = new Image();
@@ -188,17 +182,7 @@ function loadImageInto(wrap, urls, styleName) {
     btnSave.textContent = '💾 ذخیره در گالری';
     btnSave.onclick = function() {
       try {
-        const c = document.createElement('canvas');
-        c.width = img.naturalWidth || 512;
-        c.height = img.naturalHeight || 512;
-        const cx = c.getContext('2d');
-        try {
-          cx.drawImage(img, 0, 0);
-          const data = c.toDataURL('image/png');
-          state.paintings.push({ data: data, date: new Date().toLocaleDateString('fa-IR'), note: 'جادویی: ' + styleName });
-        } catch (e) {
-          state.paintings.push({ data: originalUrl, date: new Date().toLocaleDateString('fa-IR'), note: 'جادویی: ' + styleName });
-        }
+        state.paintings.push({ data: originalUrl, date: new Date().toLocaleDateString('fa-IR'), note: 'جادویی: ' + styleName });
         saveState();
         addStars(3);
         toast('در گالری ذخیره شد! ✨');
@@ -213,7 +197,6 @@ function loadImageInto(wrap, urls, styleName) {
       a.href = src;
       a.download = 'mahya-magic.png';
       a.target = '_blank';
-      a.rel = 'noopener';
       a.click();
     };
     row.appendChild(btnSave);
@@ -232,39 +215,22 @@ async function stylePainting(styleName) {
     showPage('parent');
     return;
   }
-  if (!confirm('والد عزیز: نقاشی محیا برای ساخت تصویر جادویی «' + styleName + '» ارسال شود؟')) {
-    return;
-  }
+  if (!confirm('والد عزیز: نقاشی محیا برای ساخت تصویر جادویی «' + styleName + '» ارسال شود؟')) return;
   const dataUrl = canvasToDataURL(640);
   if (!dataUrl) { toast('بوم آماده نیست'); return; }
   const box = document.getElementById('styleResult');
   box.style.display = 'block';
   box.innerHTML = 'در حال فهمیدن نقاشی... ✨';
-
   const content = [
-    {
-      type: 'text',
-      text: 'این نقاشی یک کودک ۷ ساله است. فقط بنویس:\n1) یک جمله فارسی: چه می‌بینی.\n2) یک پرامپت انگلیسی یک‌خطی برای تصویر در سبک «' + styleName + '» مناسب کودک.\nپرامپت انگلیسی را داخل ``` بگذار.'
-    },
+    { type: 'text', text: 'این نقاشی کودک است. 1) یک جمله فارسی چه می‌بینی. 2) پرامپت انگلیسی یک‌خطی سبک «' + styleName + '». پرامپت را داخل ``` بگذار.' },
     { type: 'image_url', image_url: { url: dataUrl } }
   ];
-
   const text = await callAPIVision(content, ' کوتاه باش.');
   let prompt = extractEnglishPrompt(text);
-  if (!prompt) {
-    prompt = 'cute ' + styleName + ' illustration of a child crayon drawing, soft magical colors, kawaii, safe for kids, studio ghibli style';
-  }
+  if (!prompt) prompt = 'cute ' + styleName + ' illustration, soft magical colors, kawaii, safe for kids';
   prompt = prompt.replace(/[^\x20-\x7E]/g, ' ').replace(/\s+/g, ' ').trim();
-
-  box.innerHTML =
-    '<div style="white-space:pre-wrap;margin-bottom:8px">' +
-    (text && !String(text).startsWith('⚠️') ? text : '') +
-    '</div>' +
-    '<div id="genImgWrap" style="text-align:center;min-height:120px"></div>';
-
-  const wrap = document.getElementById('genImgWrap');
-  const urls = buildImageUrls(prompt);
-  loadImageInto(wrap, urls, styleName);
+  box.innerHTML = '<div style="white-space:pre-wrap;margin-bottom:8px">' + (text && !String(text).startsWith('⚠️') ? text : '') + '</div><div id="genImgWrap" style="text-align:center;min-height:120px"></div>';
+  loadImageInto(document.getElementById('genImgWrap'), buildImageUrls(prompt), styleName);
 }
 
 document.addEventListener('change', function(e) {
@@ -283,39 +249,129 @@ document.addEventListener('change', function(e) {
 
 async function analyzeBookPage() {
   syncApiFromUI();
-  if (!state.apiKey) {
-    toast('اول کلید API را در تنظیمات والد وارد کن');
-    showPage('parent');
-    return;
-  }
+  if (!state.apiKey) { toast('اول کلید API را وارد کن'); showPage('parent'); return; }
   const prev = document.getElementById('bookPreview');
   const dataUrl = prev && prev.dataset.dataurl;
-  if (!dataUrl) {
-    toast('اول عکس صفحه کتاب را انتخاب کن');
-    return;
-  }
-  if (!confirm('والد عزیز: عکس صفحه کتاب برای ساخت سؤال آموزشی ارسال شود؟')) return;
+  if (!dataUrl) { toast('اول عکس صفحه کتاب را انتخاب کن'); return; }
+  if (!confirm('والد عزیز: عکس صفحه کتاب ارسال شود؟')) return;
   const area = document.getElementById('quizArea');
-  area.innerHTML = '<div class="msg ai">در حال خواندن صفحه کتاب و ساخت سؤال... 📚</div>';
+  area.innerHTML = '<div class="msg ai">در حال خواندن صفحه کتاب...</div>';
   const content = [
-    {
-      type: 'text',
-      text: 'این عکس صفحه کتاب درسی یک کودک کلاس اول است.\n1) متن یا موضوع درس را تا حد ممکن بخوان و خلاصه کن.\n2) دقیقاً ۳ سؤال آموزشی ساده و مناسب کلاس اول بساز.\n3) برای هر سؤال پاسخ درست را هم مشخص کن.\nخروجی را به فارسی ساده بنویس.'
-    },
+    { type: 'text', text: 'عکس صفحه کتاب کلاس اول. خلاصه کن و ۳ سؤال ساده با جواب بساز. فارسی ساده.' },
     { type: 'image_url', image_url: { url: dataUrl } }
   ];
   const text = await callAPIVision(content);
-  area.innerHTML = '<div class="msg ai" style="white-space:pre-wrap">' + (text || 'نتیجه‌ای نیامد') + '</div>' +
-    '<button class="btn secondary" style="margin-top:8px" onclick="analyzeBookPage()">دوباره بساز</button>';
+  area.innerHTML = '<div class="msg ai" style="white-space:pre-wrap">' + (text || 'نتیجه‌ای نیامد') + '</div>';
   if (text && !text.startsWith('⚠️')) addStars(2);
+}
+
+async function showRiddleMaker() {
+  const area = document.getElementById('gameArea');
+  area.innerHTML = `
+    <div class="panel">
+      <strong>🧩 معمای دلخواه محیا</strong>
+      <p class="status">بگو درباره چی معما می‌خوای؟ (تایپ یا صدا)</p>
+      <input class="input" id="riddleTopic" placeholder="مثلاً: حیوانات، فضا، رنگین‌کمان...">
+      <div class="btn-row">
+        <button class="btn secondary" type="button" onclick="startSpeech('riddleTopic')">🎤 بگو</button>
+        <button class="btn" type="button" onclick="aiRiddleFromTopic()">✨ بساز معما</button>
+      </div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn secondary" type="button" onclick="aiRiddleFromTopic('حیوانات')">🐰 حیوانات</button>
+        <button class="btn secondary" type="button" onclick="aiRiddleFromTopic('طبیعت')">🌿 طبیعت</button>
+        <button class="btn secondary" type="button" onclick="aiRiddleFromTopic('فضا و ستاره')">⭐ فضا</button>
+        <button class="btn secondary" type="button" onclick="aiRiddleFromTopic('خانه و خانواده')">🏠 خانه</button>
+      </div>
+    </div>`;
+}
+
+async function aiRiddle() { return showRiddleMaker(); }
+
+async function aiRiddleFromTopic(preset) {
+  const area = document.getElementById('gameArea');
+  const inp = document.getElementById('riddleTopic');
+  const topic = (preset || (inp && inp.value) || 'چیزهای شاد').trim();
+  area.innerHTML = '<div class="msg ai">در حال ساخت معما درباره «' + topic + '»...</div>';
+  const text = await callAPI([{role:'user', content:
+'معمای کوتاه شاد برای کودک ۷ ساله درباره «' + topic + '». فقط JSON:\n{"riddle":"معما","answer":"جواب"}'}]);
+  let riddle = 'چی در آسمان می‌درخشد؟', answer = 'ستاره';
+  try {
+    const m = (text || '').match(/\{[\s\S]*\}/);
+    if (m) {
+      const j = JSON.parse(m[0]);
+      if (j.riddle) riddle = j.riddle;
+      if (j.answer) answer = String(j.answer);
+    }
+  } catch(e) {}
+  const ansSafe = answer.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  area.innerHTML = `
+    <div class="msg ai"><strong>موضوع:</strong> ${topic}<br><br>${riddle}</div>
+    <input class="input" id="ridG" placeholder="جوابت را بنویس...">
+    <div class="btn-row">
+      <button class="btn" type="button" onclick="checkCustomRiddle('${ansSafe}')">حدس بزن</button>
+      <button class="btn secondary" type="button" onclick="showRiddleMaker()">معمای دیگر</button>
+    </div>`;
+}
+
+function checkCustomRiddle(answer) {
+  const g = (document.getElementById('ridG').value || '').trim();
+  if (!g) { toast('اول جواب را بنویس'); return; }
+  if (g === answer || answer.includes(g) || g.includes(answer)) {
+    toast('آفرین! درست گفتی 🌟');
+    addStars(2);
+  } else {
+    toast('نزدیک بود! جواب: ' + answer);
+  }
+}
+
+async function aiPattern() { return aiPatternCustom(); }
+
+async function aiPatternCustom() {
+  const area = document.getElementById('gameArea');
+  area.innerHTML = `
+    <div class="panel">
+      <strong>🔢 الگوی دلخواه</strong>
+      <p class="status">چه جور الگویی می‌خوای؟</p>
+      <input class="input" id="patTopic" placeholder="مثلاً: عدد، شکل، سخت‌تر...">
+      <div class="btn-row">
+        <button class="btn secondary" type="button" onclick="startSpeech('patTopic')">🎤 بگو</button>
+        <button class="btn" type="button" onclick="runAiPattern()">✨ بساز الگو</button>
+      </div>
+    </div>`;
+}
+
+async function runAiPattern() {
+  const area = document.getElementById('gameArea');
+  const topic = ((document.getElementById('patTopic') || {}).value || 'اعداد ساده').trim();
+  area.innerHTML = '<div class="msg ai">در حال ساخت الگو...</div>';
+  const text = await callAPI([{role:'user', content:
+'الگوی ساده برای کودک ۷ ساله موضوع «' + topic + '». فقط JSON:\n{"seq":["۲","۴","۶","۸"],"answer":"۱۰","explain":"هر بار ۲"}'}]);
+  let seq = ['۲','۴','۶','۸'], ans = '۱۰', expl = 'هر بار ۲ تا اضافه می‌شود';
+  try {
+    const m = (text || '').match(/\{[\s\S]*\}/);
+    if (m) {
+      const j = JSON.parse(m[0]);
+      if (Array.isArray(j.seq)) seq = j.seq.map(String);
+      if (j.answer != null) ans = String(j.answer);
+      if (j.explain) expl = j.explain;
+    }
+  } catch(e) {}
+  const opts = shuffle([ans, '۱۲', '۷', '۹']).slice(0, 4);
+  if (!opts.includes(ans)) opts[0] = ans;
+  area.innerHTML = `
+    <div class="msg ai">الگو: ${seq.join(' ، ')} ، ؟</div>
+    <div class="btn-row">${opts.map(n =>
+      `<button class="quiz-opt" type="button" onclick="checkPat(this,'${String(n).replace(/'/g,"\\'")}','${ans.replace(/'/g,"\\'")}')">${n}</button>`
+    ).join('')}</div>
+    <p class="status">${expl}</p>
+    <button class="btn secondary" type="button" onclick="aiPatternCustom()">الگوی جدید</button>`;
 }
 
 async function aiWordGuess() {
   const area = document.getElementById('gameArea');
-  area.innerHTML = '<div class="msg ai">در حال ساخت حدس کلمه جادویی...</div>';
-  const text = await callAPI([{role:'user', content:
-'یک بازی «حدس کلمه» برای کودک ۷ ساله بساز.\nفقط این فرمت JSON خالص را برگردان:\n{"word":"کلمه","hint":"سرنخ کوتاه فارسی"}\nکلمه باید یک اسم ساده فارسی باشد.'}]);
-  let word = 'گل', hint = 'زیبا و خوشبو در باغ';
+  area.innerHTML = '<div class="msg ai">در حال ساخت حدس کلمه...</div>';
+  const text = await callAPI([{role:'user', content:'حدس کلمه کودکانه. فقط JSON: {"word":"کلمه","hint":"سرنخ"}'}]);
+  let word = 'گل', hint = 'زیبا و خوشبو';
   try {
     const m = (text || '').match(/\{[\s\S]*\}/);
     if (m) {
@@ -327,50 +383,7 @@ async function aiWordGuess() {
   area.innerHTML = `
     <div class="msg ai">سرنخ: ${hint}</div>
     <input class="input" id="wordG" placeholder="کلمه چیست؟">
-    <button class="btn" onclick="(function(){const g=document.getElementById('wordG').value.trim();if(g==='${word}'||g.includes('${word}')){toast('درست!');addStars(2)}else toast('دوباره فکر کن 💭')})()">حدس بزن</button>
-    <button class="btn secondary" onclick="aiWordGuess()">کلمه جدید</button>`;
-}
-
-async function aiPattern() {
-  const area = document.getElementById('gameArea');
-  area.innerHTML = '<div class="msg ai">در حال ساخت الگو...</div>';
-  const text = await callAPI([{role:'user', content:
-'یک الگوی عددی ساده برای کودک ۷ ساله بساز.\nفقط JSON خالص:\n{"seq":[2,4,6,8],"answer":10,"explain":"هر بار ۲ تا اضافه می‌شود"}\nاعداد کوچک و الگوی واضح باشد.'}]);
-  let seq = [2,4,6,8], ans = 10;
-  try {
-    const m = (text || '').match(/\{[\s\S]*\}/);
-    if (m) {
-      const j = JSON.parse(m[0]);
-      if (Array.isArray(j.seq)) seq = j.seq;
-      if (j.answer != null) ans = j.answer;
-    }
-  } catch(e) {}
-  const opts = shuffle([ans, ans+1, ans-1, ans+2].map(Number));
-  area.innerHTML = `
-    <div class="msg ai">الگو را کامل کن: ${seq.join(' ، ')} ، ؟</div>
-    <div class="btn-row">${opts.map(n => `<button class="quiz-opt" onclick="checkPat(this,${n},${ans})">${n}</button>`).join('')}</div>
-    <button class="btn secondary" onclick="aiPattern()">الگوی جدید</button>`;
-}
-
-async function aiRiddle() {
-  const area = document.getElementById('gameArea');
-  area.innerHTML = '<div class="msg ai">در حال ساخت معما...</div>';
-  const text = await callAPI([{role:'user', content:
-'یک معمای کوتاه و شاد برای کودک ۷ ساله بساز.\nفقط JSON خالص:\n{"riddle":"متن معما","answer":"جواب کوتاه"}\nمعما ترسناک نباشد.'}]);
-  let riddle = 'چی همیشه می‌آد ولی هیچ‌وقت نمی‌مونه؟', answer = 'فردا';
-  try {
-    const m = (text || '').match(/\{[\s\S]*\}/);
-    if (m) {
-      const j = JSON.parse(m[0]);
-      if (j.riddle) riddle = j.riddle;
-      if (j.answer) answer = j.answer;
-    }
-  } catch(e) {}
-  area.innerHTML = `
-    <div class="msg ai">${riddle}</div>
-    <input class="input" id="ridG" placeholder="جوابت را بنویس...">
-    <button class="btn" onclick="(function(){const g=document.getElementById('ridG').value.trim();if(g && ('${answer}'.includes(g)||g.includes('${answer}'))){toast('آفرین!');addStars(2)}else{toast('نزدیک بود! جواب: ${answer}')}})()">حدس بزن</button>
-    <button class="btn secondary" onclick="aiRiddle()">معمای جدید</button>`;
+    <button class="btn" onclick="(function(){const g=document.getElementById('wordG').value.trim();if(g==='${word}'||g.includes('${word}')){toast('درست!');addStars(2)}else toast('دوباره!')})()">حدس بزن</button>`;
 }
 
 function loadPhotoToCanvas(input) {
@@ -382,16 +395,16 @@ function loadPhotoToCanvas(input) {
   reader.onload = function(ev) {
     const img = new Image();
     img.onload = function() {
-      const cw = canvas.width / 2;
-      const ch = canvas.height / 2;
+      const cw = typeof canvasCssW !== 'undefined' ? canvasCssW : (canvas.clientWidth || 300);
+      const ch = typeof canvasCssH !== 'undefined' ? canvasCssH : (canvas.clientHeight || 320);
+      const dpr = canvas.width / cw;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = '#fff';
       ctx.fillRect(0, 0, cw, ch);
       const scale = Math.min(cw / img.width, ch / img.height);
       const w = img.width * scale;
       const h = img.height * scale;
-      const x = (cw - w) / 2;
-      const y = (ch - h) / 2;
-      ctx.drawImage(img, x, y, w, h);
+      ctx.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h);
       paths = [];
       toast('عکس روی بوم قرار گرفت 📷');
       input.value = '';
@@ -411,14 +424,13 @@ async function callAPI(messages, systemExtra) {
   }
   const modelUsed = state.apiModel || 'gpt-5.6-luna';
   const base = apiBaseUrl();
-  const sys = 'تو یک دستیار مهربان، شاد و مناسب کودک ۷ ساله هستی. همیشه به فارسی ساده، کوتاه و کودکانه پاسخ بده. از محتوای نامناسب، ترسناک یا پیچیده پرهیز کن. نام کودک محیا است.' + (systemExtra || '');
+  const sys = 'تو یک دستیار مهربان، شاد و مناسب کودک ۷ ساله هستی. همیشه به فارسی ساده پاسخ بده. نام کودک محیا است.' + (systemExtra || '');
   const body = {
     model: modelUsed,
     messages: [{ role: 'system', content: sys }, ...messages],
     max_tokens: Math.max(state.maxTokens || 2048, 2048),
     temperature: 0.8
   };
-  console.log('[Mahya API]', base + '/chat/completions', 'model=', modelUsed, 'max_tokens=', body.max_tokens);
   try {
     const res = await fetch(base + '/chat/completions', {
       method: 'POST',
@@ -433,28 +445,22 @@ async function callAPI(messages, systemExtra) {
     try { data = JSON.parse(raw); } catch (_) { data = null; }
     if (!res.ok) {
       const errMsg = (data && data.error && (data.error.message || data.error.code)) || raw.slice(0, 300);
-      throw new Error('HTTP ' + res.status + ' | مدل: ' + modelUsed + ' | ' + errMsg);
+      throw new Error('HTTP ' + res.status + ' | ' + errMsg);
     }
     let text = extractReply(data);
-    const finish = data && data.choices && data.choices[0] && data.choices[0].finish_reason;
-    if (!text || !String(text).trim()) {
-      console.warn('[Mahya] empty reply, finish=', finish, 'raw=', raw.slice(0, 800));
-      return '⚠️ پاسخی دریافت نشد.\nمدل: ' + modelUsed +
-        '\nfinish_reason: ' + (finish || '?') +
-        '\nاگر finish=length بود، max_tokens را روی 4096 بگذار.';
-    }
+    if (!text || !String(text).trim()) return '⚠️ پاسخی دریافت نشد. مدل: ' + modelUsed;
     return text;
   } catch (e) {
     console.error(e);
     toast('خطا در اتصال به API');
-    return '⚠️ ' + (e.message || 'خطای شبکه یا CORS');
+    return '⚠️ ' + (e.message || 'خطای شبکه');
   }
 }
 
 async function testApi() {
   syncApiFromUI();
   const status = document.getElementById('apiStatus');
-  status.textContent = 'در حال تست با مدل ' + (state.apiModel || '?') + ' (max_tokens=' + state.maxTokens + ')...';
+  status.textContent = 'در حال تست با مدل ' + (state.apiModel || '?') + '...';
   if (!state.apiKey) {
     status.innerHTML = '<span class="error">کلید را وارد کن</span>';
     return;
@@ -463,6 +469,6 @@ async function testApi() {
   if (tokEl && parseInt(tokEl.value) < 2048) tokEl.value = '2048';
   const r = await callAPI([{ role: 'user', content: 'فقط بنویس: سلام محیا جان!' }]);
   status.innerHTML = r
-    ? '<span class="success">✅ اتصال موفق — مدل: ' + (state.apiModel || '') + '</span><br><pre style="white-space:pre-wrap;font-size:0.85rem">' + r + '</pre>'
+    ? '<span class="success">✅ موفق — ' + (state.apiModel || '') + '</span><br>' + r
     : '<span class="error">❌ ناموفق</span>';
 }
