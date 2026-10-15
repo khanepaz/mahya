@@ -190,3 +190,33 @@ async function aiRiddle() {
     <button class="btn" onclick="(function(){const g=document.getElementById('ridG').value.trim();if(g && ('${answer}'.includes(g)||g.includes('${answer}'))){toast('آفرین!');addStars(2)}else{toast('نزدیک بود! جواب: ${answer}')}})()">حدس بزن</button>
     <button class="btn secondary" onclick="aiRiddle()">معمای جدید</button>`;
 }
+
+/** بارگذاری عکس روی بوم نقاشی */
+function loadPhotoToCanvas(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  if (!canvas || !ctx) initCanvas();
+  if (!canvas || !ctx) { toast('بوم آماده نیست'); return; }
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const img = new Image();
+    img.onload = function() {
+      const cw = canvas.width / 2;
+      const ch = canvas.height / 2;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, cw, ch);
+      const scale = Math.min(cw / img.width, ch / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      const x = (cw - w) / 2;
+      const y = (ch - h) / 2;
+      ctx.drawImage(img, x, y, w, h);
+      paths = [];
+      toast('عکس روی بوم قرار گرفت 📷');
+      input.value = '';
+    };
+    img.onerror = function() { toast('خطا در بارگذاری عکس'); };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(f);
+}
