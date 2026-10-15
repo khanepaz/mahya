@@ -77,6 +77,10 @@
       <input type="range" class="size-slider" id="brushSize" min="2" max="40" value="8">
       <button class="btn secondary" style="padding:6px 12px" onclick="clearCanvas()">🗑️</button>
       <button class="btn secondary" style="padding:6px 12px" onclick="undoPaint()">↩️</button>
+      <label class="btn secondary" style="padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center">
+        📷 عکس
+        <input type="file" id="paintPhoto" accept="image/*" capture="environment" style="display:none" onchange="loadPhotoToCanvas(this)">
+      </label>
     </div>
     <div class="canvas-wrap"><canvas id="paintCanvas"></canvas></div>
     <div class="btn-row">
@@ -86,7 +90,7 @@
     </div>
     <div class="panel" style="margin-top:10px">
       <strong>✨ جادوی سبک با هوش مصنوعی</strong>
-      <p class="status">نقاشی را بکش، سبک را انتخاب کن. تأیید والد قبل از ارسال لازم است.</p>
+      <p class="status">نقاشی بکش یا عکس بگذار، بعد سبک را انتخاب کن. تأیید والد لازم است. مدل Vision انتخاب کنید.</p>
       <div class="btn-row">
         <button class="btn secondary" onclick="stylePainting('گیبلی / انیمه کودکانه')">🎬 گیبلی</button>
         <button class="btn secondary" onclick="stylePainting('واقعی و طبیعی')">📷 واقعی</button>
@@ -257,7 +261,7 @@
         <div class="btn-row" style="margin-top:12px">
           <button class="btn danger" onclick="clearAllData()">🗑️ پاک کردن همه داده‌های محلی</button>
         </div>
-        <p class="status" style="margin-top:12px;color:#c62828">⚠️ کلید فقط در حافظه نشست است. برای تصویر، مدل Vision انتخاب کنید.</p>
+        <p class="status" style="margin-top:12px;color:#c62828">⚠️ کلید فقط در حافظه نشست است. برای عکس/نقاشی مدل Vision انتخاب کنید (مثلاً gpt-5.6-luna).</p>
       </div>
     </div>
   </div>
