@@ -1,13 +1,55 @@
+/** همگام‌سازی مدل و کلید از پنل والد قبل از هر درخواست */
+function syncApiFromUI() {
+  const keyEl = document.getElementById('apiKey');
+  const baseEl = document.getElementById('apiBase');
+  const modelEl = document.getElementById('apiModel');
+  const tokEl = document.getElementById('maxTokens');
+  if (keyEl && keyEl.value.trim()) state.apiKey = keyEl.value.trim();
+  if (baseEl && baseEl.value.trim()) state.apiBase = baseEl.value.trim().replace(/\/$/, '');
+  if (modelEl && modelEl.value) state.apiModel = modelEl.value;
+  if (tokEl) state.maxTokens = parseInt(tokEl.value) || 600;
+}
+
+/** استخراج متن از پاسخ‌های مختلف API */
+function extractReply(data) {
+  if (!data) return null;
+  if (typeof data === 'string') return data;
+  const c0 = data.choices && data.choices[0];
+  if (c0) {
+    if (c0.message) {
+      const m = c0.message;
+      if (typeof m.content === 'string' && m.content.trim()) return m.content;
+      if (Array.isArray(m.content)) {
+        const parts = m.content.map(p => (typeof p === 'string' ? p : (p.text || p.content || ''))).join('');
+        if (parts.trim()) return parts;
+      }
+      if (m.refusal) return '⚠️ مدل رد کرد: ' + m.refusal;
+    }
+    if (typeof c0.text === 'string' && c0.text.trim()) return c0.text;
+    if (c0.delta && c0.delta.content) return c0.delta.content;
+  }
+  if (data.output_text) return data.output_text;
+  if (data.content && typeof data.content === 'string') return data.content;
+  if (data.error) {
+    const e = data.error;
+    return '⚠️ خطا: ' + (e.message || e.code || JSON.stringify(e));
+  }
+  return null;
+}
+
 /** ارسال پیام متنی یا چندرسانه‌ای (متن + تصویر base64) */
 async function callAPIVision(userContent, systemExtra) {
+  syncApiFromUI();
   if (!state.apiKey) {
     toast('کلید API را در تنظیمات والد وارد کن');
     showPage('parent');
     return null;
   }
+  const modelUsed = state.apiModel || 'grok-4.5';
+  const base = (state.apiBase || 'https://cleanapis.com/v1').replace(/\/$/, '');
   const sys = 'تو یک دستیار مهربان، شاد و مناسب کودک ۷ ساله هستی. همیشه به فارسی ساده، کوتاه و کودکانه پاسخ بده. از محتوای نامناسب پرهیز کن. نام کودک محیا است.' + (systemExtra || '');
   const body = {
-    model: state.apiModel || 'grok-4.5',
+    model: modelUsed,
     messages: [
       { role: 'system', content: sys },
       { role: 'user', content: userContent }
@@ -15,8 +57,9 @@ async function callAPIVision(userContent, systemExtra) {
     max_tokens: state.maxTokens || 800,
     temperature: 0.7
   };
+  console.log('[Mahya API]', base + '/chat/completions', 'model=', modelUsed);
   try {
-    const res = await fetch((state.apiBase || 'https://www.cleanapis.com/v1') + '/chat/completions', {
+    const res = await fetch(base + '/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -24,12 +67,23 @@ async function callAPIVision(userContent, systemExtra) {
       },
       body: JSON.stringify(body)
     });
+    const raw = await res.text();
+    let data;
+    try { data = JSON.parse(raw); } catch (_) { data = null; }
     if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error('خطای HTTP ' + res.status + (errText ? ': ' + errText.slice(0, 150) : ''));
+      const errMsg = (data && data.error && (data.error.message || data.error.code)) || raw.slice(0, 200);
+      throw new Error('HTTP ' + res.status + ' | مدل: ' + modelUsed + ' | ' + errMsg);
     }
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content || data.choices?.[0]?.text || 'پاسخی دریافت نشد.';
+    let text = extractReply(data);
+    const usedModel = (data && (data.model || data.model_id)) || modelUsed;
+    if (!text || !String(text).trim()) {
+      console.warn('[Mahya] empty reply, raw:', raw.slice(0, 500));
+      return '⚠️ پاسخی دریافت نشد.\nمدل درخواست‌شده: ' + modelUsed + '\nمدل در پاسخ: ' + usedModel + '\n(جزئیات در Console — F12)';
+    }
+    if (typeof text === 'string' && !text.startsWith('⚠️')) {
+      text = text + '\n\n— مدل: ' + usedModel;
+    }
+    return text;
   } catch (e) {
     console.error(e);
     toast('خطا در اتصال به API');
@@ -219,4 +273,65 @@ function loadPhotoToCanvas(input) {
     img.src = ev.target.result;
   };
   reader.readAsDataURL(f);
+}
+
+/** بازنویسی callAPI تا همیشه مدل انتخاب‌شده را بفرستد */
+async function callAPI(messages, systemExtra) {
+  syncApiFromUI();
+  if (!state.apiKey) {
+    toast('کلید API را در تنظیمات والد وارد کن');
+    showPage('parent');
+    return null;
+  }
+  const modelUsed = state.apiModel || 'grok-4.5';
+  const base = (state.apiBase || 'https://cleanapis.com/v1').replace(/\/$/, '');
+  const sys = 'تو یک دستیار مهربان، شاد و مناسب کودک ۷ ساله هستی. همیشه به فارسی ساده، کوتاه و کودکانه پاسخ بده. از محتوای نامناسب، ترسناک یا پیچیده پرهیز کن. نام کودک محیا است.' + (systemExtra || '');
+  const body = {
+    model: modelUsed,
+    messages: [{ role: 'system', content: sys }, ...messages],
+    max_tokens: state.maxTokens || 600,
+    temperature: 0.8
+  };
+  console.log('[Mahya API]', base + '/chat/completions', 'model=', modelUsed);
+  try {
+    const res = await fetch(base + '/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + state.apiKey
+      },
+      body: JSON.stringify(body)
+    });
+    const raw = await res.text();
+    let data;
+    try { data = JSON.parse(raw); } catch (_) { data = null; }
+    if (!res.ok) {
+      const errMsg = (data && data.error && (data.error.message || data.error.code)) || raw.slice(0, 200);
+      throw new Error('HTTP ' + res.status + ' | مدل: ' + modelUsed + ' | ' + errMsg);
+    }
+    let text = extractReply(data);
+    const usedModel = (data && (data.model || data.model_id)) || modelUsed;
+    if (!text || !String(text).trim()) {
+      console.warn('[Mahya] empty reply, raw:', raw.slice(0, 500));
+      return '⚠️ پاسخی دریافت نشد.\nمدل درخواست‌شده: ' + modelUsed + '\nمدل در پاسخ: ' + usedModel;
+    }
+    return text;
+  } catch (e) {
+    console.error(e);
+    toast('خطا در اتصال به API');
+    return '⚠️ ' + (e.message || 'خطای شبکه یا CORS');
+  }
+}
+
+async function testApi() {
+  syncApiFromUI();
+  document.getElementById('apiStatus').textContent = 'در حال تست با مدل ' + (state.apiModel || '?') + '...';
+  if (!state.apiKey) {
+    document.getElementById('apiStatus').innerHTML = '<span class="error">کلید را وارد کن</span>';
+    return;
+  }
+  const r = await callAPI([{ role: 'user', content: 'فقط بنویس: سلام محیا جان! مدل تو چیست؟' }]);
+  document.getElementById('apiStatus').innerHTML = r
+    ? '<span class="success">✅ اتصال موفق — مدل انتخابی: ' + (state.apiModel || '') + '</span><br>' + r
+    : '<span class="error">❌ ناموفق</span>';
 }
