@@ -118,15 +118,15 @@ function canvasToDataURL(maxW) {
   return tmp.toDataURL('image/jpeg', 0.7);
 }
 
-/** ساخت تصویر واقعی و نمایش داخل اپ (سرویس رایگان تصویر — بدون خروج از برنامه) */
-async function generateStyleImage(prompt, styleName) {
-  const safe = encodeURIComponent(
-    (prompt || 'cute children drawing, soft pastel, magical') +
-    ', children book illustration, safe for kids, no text, high quality'
-  );
-  const url = 'https://image.pollinations.ai/prompt/' + safe +
-    '?width=768&height=768&nologo=true&enhance=true&seed=' + Date.now();
-  return url;
+function buildImageUrls(prompt) {
+  const p = (prompt || 'cute magical children illustration, soft pastel, kawaii').slice(0, 300);
+  const enc = encodeURIComponent(p);
+  const seed = Date.now() % 1000000;
+  return [
+    'https://image.pollinations.ai/prompt/' + enc + '?width=768&height=768&nologo=true&seed=' + seed,
+    'https://pollinations.ai/p/' + enc + '?width=768&height=768&nologo=true&seed=' + seed,
+    'https://image.pollinations.ai/prompt/' + enc + '?model=flux&width=768&height=768&nologo=true&seed=' + seed
+  ];
 }
 
 function extractEnglishPrompt(aiText) {
@@ -139,6 +139,90 @@ function extractEnglishPrompt(aiText) {
     if (/^[a-zA-Z0-9 ,.'"\-!?:;()]+$/.test(l) && l.split(' ').length >= 5) return l;
   }
   return null;
+}
+
+function loadImageInto(wrap, urls, styleName) {
+  if (!wrap) return;
+  let i = 0;
+  function tryNext() {
+    if (i >= urls.length) {
+      wrap.innerHTML = '<p class="error">ساخت تصویر ممکن نشد (شبکه یا فیلتر سرویس تصویر).</p>' +
+        '<p class="status">اگر فیلتر اینترنت دارید، یک‌بار با اینترنت دیگر یا VPN امتحان کنید.</p>' +
+        '<button class="btn secondary" type="button" id="btnRetryStyle">تلاش دوباره</button>';
+      const b = document.getElementById('btnRetryStyle');
+      if (b) b.onclick = function() { stylePainting(styleName); };
+      return;
+    }
+    const url = urls[i++];
+    wrap.innerHTML = '<p class="status">🎨 در حال بارگذاری عکس جادویی... (' + i + '/' + urls.length + ')</p>';
+    fetch(url, { mode: 'cors', cache: 'no-store' })
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.blob();
+      })
+      .then(function(blob) {
+        if (blob && blob.size < 800) throw new Error('empty');
+        const obj = URL.createObjectURL(blob);
+        showImg(obj, url);
+      })
+      .catch(function() {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function() { showImg(url, url); };
+        img.onerror = function() { tryNext(); };
+        img.src = url;
+      });
+  }
+  function showImg(src, originalUrl) {
+    wrap.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = 'نسخه جادویی';
+    img.style.cssText = 'max-width:100%;border-radius:16px;box-shadow:0 8px 24px rgba(233,30,140,0.25);margin-top:8px';
+    wrap.appendChild(img);
+    const row = document.createElement('div');
+    row.className = 'btn-row';
+    row.style.marginTop = '10px';
+    const btnSave = document.createElement('button');
+    btnSave.className = 'btn';
+    btnSave.textContent = '💾 ذخیره در گالری';
+    btnSave.onclick = function() {
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth || 512;
+        c.height = img.naturalHeight || 512;
+        const cx = c.getContext('2d');
+        try {
+          cx.drawImage(img, 0, 0);
+          const data = c.toDataURL('image/png');
+          state.paintings.push({ data: data, date: new Date().toLocaleDateString('fa-IR'), note: 'جادویی: ' + styleName });
+        } catch (e) {
+          state.paintings.push({ data: originalUrl, date: new Date().toLocaleDateString('fa-IR'), note: 'جادویی: ' + styleName });
+        }
+        saveState();
+        addStars(3);
+        toast('در گالری ذخیره شد! ✨');
+        if (typeof renderArtGallery === 'function') renderArtGallery();
+      } catch (e) { toast('ذخیره نشد'); }
+    };
+    const btnDl = document.createElement('button');
+    btnDl.className = 'btn secondary';
+    btnDl.textContent = '⬇️ دانلود';
+    btnDl.onclick = function() {
+      const a = document.createElement('a');
+      a.href = src;
+      a.download = 'mahya-magic.png';
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.click();
+    };
+    row.appendChild(btnSave);
+    row.appendChild(btnDl);
+    wrap.appendChild(row);
+    addStars(2);
+    toast('عکس جادویی آماده شد! 🌟');
+  }
+  tryNext();
 }
 
 async function stylePainting(styleName) {
@@ -155,78 +239,32 @@ async function stylePainting(styleName) {
   if (!dataUrl) { toast('بوم آماده نیست'); return; }
   const box = document.getElementById('styleResult');
   box.style.display = 'block';
-  box.innerHTML = 'در حال جادو کردن نقاشی با سبک ' + styleName + '... ✨<br><small>اول تحلیل با هوش مصنوعی، بعد ساخت عکس داخل برنامه</small>';
+  box.innerHTML = 'در حال فهمیدن نقاشی... ✨';
 
   const content = [
     {
       type: 'text',
-      text: 'این نقاشی یک کودک ۷ ساله است. لطفاً فقط این خروجی را بده:\n1) یک جمله فارسی کوتاه: چه می‌بینی.\n2) یک پرامپت انگلیسی یک‌خطی برای ساخت تصویر در سبک «' + styleName + '» (فقط انگلیسی، بدون توضیح اضافه، مناسب کودک).\nپرامپت را داخل ``` بگذار.'
+      text: 'این نقاشی یک کودک ۷ ساله است. فقط بنویس:\n1) یک جمله فارسی: چه می‌بینی.\n2) یک پرامپت انگلیسی یک‌خطی برای تصویر در سبک «' + styleName + '» مناسب کودک.\nپرامپت انگلیسی را داخل ``` بگذار.'
     },
     { type: 'image_url', image_url: { url: dataUrl } }
   ];
 
-  const text = await callAPIVision(content, ' پاسخ کوتاه باش.');
+  const text = await callAPIVision(content, ' کوتاه باش.');
   let prompt = extractEnglishPrompt(text);
   if (!prompt) {
-    prompt = 'children crayon drawing restyled as ' + styleName +
-      ', cute magical illustration, soft colors, Studio Ghibli inspired, kawaii, safe for kids';
+    prompt = 'cute ' + styleName + ' illustration of a child crayon drawing, soft magical colors, kawaii, safe for kids, studio ghibli style';
   }
+  prompt = prompt.replace(/[^\x20-\x7E]/g, ' ').replace(/\s+/g, ' ').trim();
 
-  box.innerHTML = '<div style="white-space:pre-wrap;margin-bottom:10px">' +
-    (text && !String(text).startsWith('⚠️') ? text : 'در حال ساخت تصویر جادویی...') +
-    '</div><p class="status">🎨 در حال ساخت عکس واقعی داخل برنامه...</p>' +
-    '<div id="genImgWrap" style="text-align:center;margin-top:8px"></div>';
+  box.innerHTML =
+    '<div style="white-space:pre-wrap;margin-bottom:8px">' +
+    (text && !String(text).startsWith('⚠️') ? text : '') +
+    '</div>' +
+    '<div id="genImgWrap" style="text-align:center;min-height:120px"></div>';
 
-  try {
-    const imgUrl = await generateStyleImage(prompt, styleName);
-    const wrap = document.getElementById('genImgWrap');
-    const img = new Image();
-    img.alt = 'نسخه جادویی نقاشی';
-    img.style.cssText = 'max-width:100%;border-radius:16px;box-shadow:0 8px 24px rgba(233,30,140,0.25);margin-top:8px';
-    img.onload = function() {
-      if (wrap) {
-        wrap.innerHTML = '';
-        wrap.appendChild(img);
-        const row = document.createElement('div');
-        row.className = 'btn-row';
-        row.style.marginTop = '10px';
-        row.innerHTML =
-          '<button class="btn" type="button" id="btnSaveGen">💾 ذخیره در گالری</button>' +
-          '<button class="btn secondary" type="button" id="btnDlGen">⬇️ دانلود</button>';
-        wrap.appendChild(row);
-        document.getElementById('btnSaveGen').onclick = function() {
-          try {
-            state.paintings.push({
-              data: imgUrl,
-              date: new Date().toLocaleDateString('fa-IR'),
-              note: 'جادویی: ' + styleName
-            });
-            saveState();
-            addStars(3);
-            toast('در گالری ذخیره شد! ✨');
-            if (typeof renderArtGallery === 'function') renderArtGallery();
-          } catch (e) { toast('ذخیره نشد'); }
-        };
-        document.getElementById('btnDlGen').onclick = function() {
-          const a = document.createElement('a');
-          a.href = imgUrl;
-          a.download = 'mahya-magic.png';
-          a.target = '_blank';
-          a.click();
-        };
-      }
-      addStars(2);
-      toast('عکس جادویی آماده شد! 🌟');
-    };
-    img.onerror = function() {
-      if (wrap) wrap.innerHTML = '<p class="error">ساخت تصویر ممکن نشد. اینترنت را چک کن یا دوباره بزن.</p>' +
-        '<button class="btn secondary" onclick="stylePainting(\'' + styleName.replace(/'/g, '') + '\')">تلاش دوباره</button>';
-    };
-    img.src = imgUrl;
-  } catch (e) {
-    console.error(e);
-    box.innerHTML += '<p class="error">خطا در ساخت تصویر: ' + (e.message || e) + '</p>';
-  }
+  const wrap = document.getElementById('genImgWrap');
+  const urls = buildImageUrls(prompt);
+  loadImageInto(wrap, urls, styleName);
 }
 
 document.addEventListener('change', function(e) {
