@@ -72,7 +72,7 @@
       <div class="btn-row">
         <button class="btn" onclick="makeStory()">✨ بساز قصه</button>
         <button class="btn secondary" onclick="startSpeech('storyWords')">🎤 بگو</button>
-        <button class="btn secondary" onclick="speakText(document.getElementById('storyResult').innerText)">🔊 بخوان</button>
+        <button class="btn secondary" onclick="speakElement('storyResult')">🔊 بخوان</button>
       </div>
       <div id="storyResult" class="msg ai" style="display:none"></div>
       <div class="btn-row" id="storyChoices" style="display:none"></div>
@@ -186,7 +186,7 @@
       <select class="select" id="poemType"><option>شعر کوتاه</option><option>داستان قبل از خواب</option><option>داستان خنده‌دار</option></select>
       <div class="btn-row">
         <button class="btn" onclick="makePoem()">✨ بساز</button>
-        <button class="btn secondary" onclick="speakText(document.getElementById('poemResult').innerText)">🔊 بخوان</button>
+        <button class="btn secondary" onclick="speakElement('poemResult')">🔊 بخوان</button>
         <button class="btn secondary" onclick="stopSpeak()">⏹️ توقف</button>
       </div>
       <div id="poemResult" class="msg ai" style="display:none"></div>
@@ -323,6 +323,7 @@
 <script src="app-paint-fix.js"></script>
 <script src="app-part2.js"></script>
 <script src="app-backup.js"></script>
+<script src="app-speech-fix.js"></script>
 <script src="app-ai.js"></script>
 </body>
 </html>
