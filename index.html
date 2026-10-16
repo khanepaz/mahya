@@ -1,1 +1,326 @@
-<PLACEHOLDER_WILL_FAIL>
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>دنیای جادویی محیا | Mahya's Magical World</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="logo">✨ دنیای جادویی <span class="logo-accent">محیا</span></div>
+    <div class="header-actions">
+      <div class="stars-badge" id="starsBadge">⭐ <span id="starsCount">0</span></div>
+      <div class="avatar-btn" id="avatarBtn" onclick="showPage('avatar')" title="آواتار">🐰</div>
+    </div>
+  </div>
+  <div class="page active" id="page-home">
+    <div class="hero-banner">
+      <div class="hero-text">
+        <h1 id="greet">سلام محیا! 💖</h1>
+        <p class="hero-sub">به دنیای جادویی خودت خوش اومدی</p>
+        <p class="hero-desc">اینجا می‌تونی نقاشی بکشی، بازی کنی، یاد بگیری و کلی چیزای قشنگ کشف کنی!</p>
+      </div>
+      <div class="hero-emoji" aria-hidden="true">🦄🏰🌈</div>
+    </div>
+    <div class="main-cats" id="mainCats">
+      <button type="button" class="cat-card cat-art" onclick="showPage('art')">
+        <span class="cat-icon">🎨</span>
+        <span class="cat-title">استودیوی نقاشی</span>
+        <span class="cat-desc">رنگ‌ها، خیال‌پردازی، خلاقیت!</span>
+        <span class="cat-arrow">←</span>
+      </button>
+      <button type="button" class="cat-card cat-learn" onclick="showPage('school')">
+        <span class="cat-icon">📚</span>
+        <span class="cat-title">یادگیری تعاملی</span>
+        <span class="cat-desc">از کتاب تا سؤال، با کمک هوش مصنوعی</span>
+        <span class="cat-arrow">←</span>
+      </button>
+      <button type="button" class="cat-card cat-games" onclick="showPage('games')">
+        <span class="cat-icon">🎮</span>
+        <span class="cat-title">بازی‌های آموزشی</span>
+        <span class="cat-desc">معما، حدس کلمه، الگوهای عددی...</span>
+        <span class="cat-arrow">←</span>
+      </button>
+      <button type="button" class="cat-card cat-ai" onclick="showPage('homework')">
+        <span class="cat-icon">🤖</span>
+        <span class="cat-title">دستیار هوشمند</span>
+        <span class="cat-desc">پرسش بپرس، کشف کن، یاد بگیر</span>
+        <span class="cat-arrow">←</span>
+      </button>
+    </div>
+    <div class="panel suggest-panel" id="todaySuggest">
+      <strong>💡 پیشنهاد امروز:</strong>
+      <span id="suggestText">نقاشی یک خانه روی ابرها</span>
+      <button class="btn btn-sm" onclick="doSuggest()">شروع کن</button>
+    </div>
+    <div class="section-label">همه بخش‌ها</div>
+    <div class="grid" id="sectionsGrid"></div>
+    <div class="footer-motto">💖 هر روز یک قدم به سمت رویاهایت!</div>
+  </div>
+  <div class="page" id="page-story">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">📖 کارخانه قصه‌های جادویی</div></div>
+    <div class="panel">
+      <label class="label">کلمات جادویی را انتخاب کن یا بنویس:</label>
+      <div id="storyChips"></div>
+      <input class="input" id="storyWords" placeholder="مثلاً: خرگوش، قلعه، ماه...">
+      <label class="label">شخصیت اصلی:</label>
+      <select class="select" id="storyHero"><option>خرگوش</option><option>گربه</option><option>تک‌شاخ</option><option>پرنسس</option><option>ربات مهربان</option></select>
+      <label class="label">سبک:</label>
+      <select class="select" id="storyStyle"><option>ماجراجویانه</option><option>خنده‌دار</option><option>آرام و مهربان</option></select>
+      <div class="btn-row">
+        <button class="btn" onclick="makeStory()">✨ بساز قصه</button>
+        <button class="btn secondary" onclick="startSpeech('storyWords')">🎤 بگو</button>
+        <button class="btn secondary" onclick="speakText(document.getElementById('storyResult').innerText)">🔊 بخوان</button>
+      </div>
+      <div id="storyResult" class="msg ai" style="display:none"></div>
+      <div class="btn-row" id="storyChoices" style="display:none"></div>
+      <button class="btn secondary" style="margin-top:8px" onclick="saveToTreasure('story')">💾 ذخیره در گنجینه</button>
+    </div>
+  </div>
+  <div class="page" id="page-school">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">🏫 مدرسه رنگین‌کمانی</div></div>
+    <div class="panel">
+      <div class="btn-row">
+        <button class="btn" onclick="startMathQuiz()">➕ جمع و تفریق</button>
+        <button class="btn secondary" onclick="startLetterQuiz()">🔤 حروف فارسی</button>
+        <button class="btn secondary" onclick="startCountQuiz()">🔢 شمارش</button>
+        <button class="btn secondary" onclick="startShapeQuiz()">🔷 شکل‌ها</button>
+      </div>
+      <hr style="border:none;border-top:1px solid #f0d0e8;margin:14px 0">
+      <strong>📷 عکس صفحه کتاب → سؤال هوشمند</strong>
+      <p class="status">عکس واضح از صفحه درس بگیر یا انتخاب کن. تأیید والد قبل از ارسال لازم است.</p>
+      <input type="file" id="bookPhoto" accept="image/*" capture="environment" class="input">
+      <div id="bookPreview" style="margin:8px 0"></div>
+      <button class="btn" onclick="analyzeBookPage()">✨ بساز سؤال از این درس</button>
+      <div id="quizArea"></div>
+    </div>
+  </div>
+  <div class="page" id="page-art">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">🎨 استودیوی جادویی هنر</div></div>
+    <div class="tools">
+      <div class="color-btn active" style="background:#e91e8c" data-c="#e91e8c" onclick="setColor(this)"></div>
+      <div class="color-btn" style="background:#9c27b0" data-c="#9c27b0" onclick="setColor(this)"></div>
+      <div class="color-btn" style="background:#2196f3" data-c="#2196f3" onclick="setColor(this)"></div>
+      <div class="color-btn" style="background:#4caf50" data-c="#4caf50" onclick="setColor(this)"></div>
+      <div class="color-btn" style="background:#ff9800" data-c="#ff9800" onclick="setColor(this)"></div>
+      <div class="color-btn" style="background:#000" data-c="#000" onclick="setColor(this)"></div>
+      <div class="color-btn" style="background:#fff;border:2px solid #ccc" data-c="#fff" onclick="setColor(this)" title="پاک‌کن"></div>
+      <input type="range" class="size-slider" id="brushSize" min="2" max="40" value="8">
+      <button class="btn secondary" style="padding:6px 12px" onclick="clearCanvas()">🗑️</button>
+      <button class="btn secondary" style="padding:6px 12px" onclick="undoPaint()">↩️</button>
+      <label class="btn secondary" style="padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center">
+        📷 عکس
+        <input type="file" id="paintPhoto" accept="image/*" capture="environment" style="display:none" onchange="loadPhotoToCanvas(this)">
+      </label>
+    </div>
+    <div class="canvas-wrap"><canvas id="paintCanvas"></canvas></div>
+    <div class="btn-row">
+      <button class="btn" onclick="savePainting()">💾 ذخیره نقاشی</button>
+      <button class="btn secondary" onclick="downloadPainting()">⬇️ دانلود PNG</button>
+      <button class="btn secondary" onclick="loadIdea()">💡 ایده تصادفی</button>
+    </div>
+    <div class="panel" style="margin-top:10px">
+      <strong>✨ جادوی سبک با هوش مصنوعی</strong>
+      <p class="status">نقاشی بکش یا عکس بگذار، بعد سبک را انتخاب کن.</p>
+      <div class="btn-row">
+        <button class="btn secondary" onclick="stylePainting('گیبلی / انیمه کودکانه')">🎬 گیبلی</button>
+        <button class="btn secondary" onclick="stylePainting('واقعی و طبیعی')">📷 واقعی</button>
+        <button class="btn secondary" onclick="stylePainting('کارتونی رنگی')">🎨 کارتونی</button>
+        <button class="btn secondary" onclick="stylePainting('آبرنگ لطیف')">💧 آبرنگ</button>
+        <button class="btn secondary" onclick="stylePainting('داستان مصور')">📚 مصور</button>
+      </div>
+      <div id="styleResult" class="msg ai" style="display:none;margin-top:8px"></div>
+    </div>
+    <p class="status" id="paintIdea"></p>
+    <div class="panel" style="margin-top:12px">
+      <strong>گالری نقاشی‌های من</strong>
+      <div class="gallery-grid" id="artGallery"></div>
+    </div>
+  </div>
+  <div class="page" id="page-animals">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">🌲 جنگل اسرارآمیز</div></div>
+    <div class="btn-row">
+      <button class="btn" onclick="showAnimals()">📋 لیست حیوانات</button>
+      <button class="btn secondary" onclick="guessAnimal()">❓ حدس حیوان</button>
+      <button class="btn secondary" onclick="buildAnimal()">🦄 حیوان خیالی بساز</button>
+    </div>
+    <div id="animalsArea"></div>
+  </div>
+  <div class="page" id="page-create">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">💡 کارگاه مخترع‌های کوچک</div></div>
+    <div class="panel">
+      <div class="btn-row">
+        <button class="btn" onclick="ifYouWere()">🌟 اگر جای ... بودی</button>
+        <button class="btn secondary" onclick="inventSomething()">🔧 اختراع کن</button>
+        <button class="btn secondary" onclick="unfinishedStory()">📖 داستان ناتمام</button>
+      </div>
+      <div id="createArea"></div>
+      <label class="label">دفتر ایده‌ها:</label>
+      <textarea class="textarea" id="ideaBox" placeholder="ایده‌ات را اینجا بنویس..."></textarea>
+      <button class="btn" onclick="saveIdea()">💾 ذخیره ایده</button>
+      <div id="ideasList"></div>
+    </div>
+  </div>
+  <div class="page" id="page-homework">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">📚 دوست کوچولوی یادگیری</div></div>
+    <div class="panel">
+      <p class="status">کلید API را در تنظیمات والد وارد کن.</p>
+      <textarea class="textarea" id="hwQuestion" placeholder="سؤال درس‌ات را بنویس..."></textarea>
+      <div class="btn-row">
+        <button class="btn" onclick="askHomework()">❓ بپرس</button>
+        <button class="btn secondary" onclick="startSpeech('hwQuestion')">🎤 بگو</button>
+        <button class="btn secondary" onclick="askHomework('ساده‌تر بگو')">🧒 ساده‌تر بگو</button>
+        <button class="btn secondary" onclick="askHomework('یک مثال بزن')">📌 مثال بزن</button>
+      </div>
+      <div id="hwChat"></div>
+    </div>
+  </div>
+  <div class="page" id="page-poems">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">🎵 جعبه موسیقی قصه‌ها</div></div>
+    <div class="panel">
+      <label class="label">موضوع:</label>
+      <select class="select" id="poemTopic"><option>دوستی</option><option>حیوانات</option><option>خانواده</option><option>طبیعت</option><option>خواب</option><option>ماجراجویی</option></select>
+      <label class="label">نوع:</label>
+      <select class="select" id="poemType"><option>شعر کوتاه</option><option>داستان قبل از خواب</option><option>داستان خنده‌دار</option></select>
+      <div class="btn-row">
+        <button class="btn" onclick="makePoem()">✨ بساز</button>
+        <button class="btn secondary" onclick="speakText(document.getElementById('poemResult').innerText)">🔊 بخوان</button>
+        <button class="btn secondary" onclick="stopSpeak()">⏹️ توقف</button>
+      </div>
+      <div id="poemResult" class="msg ai" style="display:none"></div>
+      <button class="btn secondary" onclick="saveToTreasure('poem')">💾 ذخیره</button>
+    </div>
+  </div>
+  <div class="page" id="page-schedule">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">📅 تقویم رنگین‌کمانی من</div></div>
+    <div class="panel">
+      <div class="progress-bar"><div id="schedProgress" style="width:0%"></div></div>
+      <p class="status" id="schedStatus">۰ از ۰ انجام شده</p>
+      <div id="schedList"></div>
+      <div class="btn-row">
+        <input class="input" id="newActivity" placeholder="فعالیت جدید..." style="flex:1">
+        <button class="btn" onclick="addActivity()">➕</button>
+      </div>
+      <button class="btn secondary" onclick="resetSchedule()">🔄 برنامه پیش‌فرض</button>
+    </div>
+  </div>
+  <div class="page" id="page-cook">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">🍳 آشپزخانه کوچولوی رنگی</div></div>
+    <div class="panel">
+      <p class="status" style="color:#c62828">⚠️ همیشه با حضور بزرگسال آشپزی کن!</p>
+      <div id="recipesList"></div>
+      <div id="recipeDetail" class="hidden"></div>
+    </div>
+  </div>
+  <div class="page" id="page-crafts">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">✂️ کارگاه دست‌های جادویی</div></div>
+    <div class="panel">
+      <p class="status">ابزار تیز فقط با حضور بزرگسال!</p>
+      <div id="craftsList"></div>
+      <div id="craftDetail" class="hidden"></div>
+    </div>
+  </div>
+  <div class="page" id="page-games">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">🧩 سرزمین معماهای رنگی</div></div>
+    <div class="btn-row">
+      <button class="btn" onclick="startMemory()">🃏 حافظه</button>
+      <button class="btn secondary" onclick="startPattern()">🔢 الگو</button>
+      <button class="btn secondary" onclick="startOddOne()">🔍 شکل متفاوت</button>
+      <button class="btn secondary" onclick="startWordGuess()">🔤 حدس کلمه</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="aiWordGuess()">✨ حدس کلمه با AI</button>
+      <button class="btn secondary" onclick="aiPattern()">✨ الگو با AI</button>
+      <button class="btn secondary" onclick="showRiddleMaker()">✨ معمای دلخواه</button>
+    </div>
+    <p class="status">معما و الگو را با تایپ یا 🎤 صدا موضوعش را بگو.</p>
+    <div id="gameArea"></div>
+  </div>
+  <div class="page" id="page-dreams">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">🌙 باغ رؤیاهای محیا</div></div>
+    <div class="panel">
+      <label class="label">آرزویم:</label>
+      <textarea class="textarea" id="dreamText" placeholder="آرزو یا رؤیایت را بنویس..."></textarea>
+      <div class="btn-row">
+        <button class="btn" onclick="saveDream()">💾 ذخیره آرزو</button>
+        <button class="btn secondary" onclick="dreamStory()">📖 داستان از آرزو</button>
+      </div>
+      <div id="dreamsList"></div>
+      <label class="label" style="margin-top:16px">سیاره شخصی من:</label>
+      <div class="btn-row">
+        <select class="select" id="planetColor" style="flex:1"><option>صورتی</option><option>آبی</option><option>سبز</option><option>بنفش</option><option>طلایی</option></select>
+        <select class="select" id="planetThing" style="flex:1"><option>جنگل شکلاتی</option><option>رودخانه آب‌نبات</option><option>کوه رنگین‌کمان</option><option>دریاچه ستاره</option></select>
+      </div>
+      <button class="btn" onclick="describePlanet()">🪐 توصیف سیاره</button>
+      <div id="planetResult" class="msg ai" style="display:none;margin-top:10px"></div>
+    </div>
+  </div>
+  <div class="page" id="page-treasure">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">💎 گنجینه آثار من</div></div>
+    <div class="panel" id="treasureArea"></div>
+  </div>
+  <div class="page" id="page-avatar">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">🐰 آواتار محیا</div></div>
+    <div class="panel" style="text-align:center">
+      <div style="font-size:5rem;margin:16px" id="avatarPreview">🐰</div>
+      <label class="label">شخصیت:</label>
+      <div id="avatarChoices"></div>
+      <button class="btn" style="margin-top:12px" onclick="saveAvatar()">✅ ذخیره</button>
+    </div>
+  </div>
+  <div class="page" id="page-parent">
+    <div class="section-header"><button class="back-btn" onclick="showPage('home')">🏠</button><div class="section-title">🔐 تنظیمات والد</div></div>
+    <div class="panel">
+      <p class="status">کد ورود پیش‌فرض: <strong>1234</strong></p>
+      <div id="parentLock">
+        <input class="input" type="password" id="parentPin" placeholder="کد والد">
+        <button class="btn" onclick="unlockParent()">ورود</button>
+      </div>
+      <div id="parentPanel" class="hidden">
+        <p class="status" style="font-size:0.8rem;color:#888">توجه: کد ورود فقط برای جلوگیری از تغییر تصادفی توسط کودک است و امنیت واقعی نیست.</p>
+        <label class="label">کلید API:</label>
+        <input class="input" type="password" id="apiKey" placeholder="sk-..." autocomplete="off">
+        <label class="label">آدرس پایه API:</label>
+        <input class="input" id="apiBase" value="https://cleanapis.com/v1">
+        <label class="label">مدل:</label>
+        <select class="select" id="apiModel"><option value="gpt-5.6-luna">gpt-5.6-luna</option></select>
+        <div class="btn-row">
+          <button class="btn" onclick="testApi()">🔌 تست اتصال</button>
+          <button class="btn secondary" onclick="fetchModels()">📋 دریافت مدل‌ها</button>
+        </div>
+        <div id="apiStatus" class="status"></div>
+        <label class="label">حداکثر توکن خروجی:</label>
+        <input class="input" type="number" id="maxTokens" value="2048" min="256" max="8192">
+        <hr style="border:none;border-top:1px solid #f0d0e8;margin:14px 0">
+        <strong>پشتیبان‌گیری</strong>
+        <p class="status">نقاشی‌ها و آثار محیا را روی فایل ذخیره کن یا برگردان.</p>
+        <div class="btn-row">
+          <button class="btn secondary" onclick="exportBackup()">⬇️ خروجی پشتیبان</button>
+          <label class="btn secondary" style="cursor:pointer;display:inline-flex;align-items:center">
+            ⬆️ بازیابی
+            <input type="file" id="backupFile" accept=".json,application/json" style="display:none" onchange="importBackup(this)">
+          </label>
+        </div>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn danger" onclick="clearAllData()">🗑️ پاک کردن داده‌ها</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="nav-bottom">
+  <button class="nav-item active" onclick="showPage('home')"><span>🏠</span>خانه</button>
+  <button class="nav-item" onclick="showPage('art')"><span>🎨</span>نقاشی</button>
+  <button class="nav-item" onclick="showPage('games')"><span>🧩</span>بازی</button>
+  <button class="nav-item" onclick="showPage('treasure')"><span>💎</span>گنجینه</button>
+  <button class="nav-item" onclick="showPage('parent')"><span>🔐</span>والد</button>
+</div>
+<div class="toast" id="toast"></div>
+<script src="app-part1.js"></script>
+<script src="app-paint-fix.js"></script>
+<script src="app-part2.js"></script>
+<script src="app-ai.js"></script>
+</body>
+</html>
